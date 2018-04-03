@@ -19,11 +19,15 @@
 
 #define random(a,b) (rand()%(b-a+1)+a)
 #define NUMSIZE 50
+#define STACKSIZE 50
 #define GEN 100
 
 using namespace std;
 
-typedef struct {
+
+
+//definition of Node
+typedef struct node {
 	//the node of string
 	char c;
 	int num;
@@ -32,25 +36,25 @@ typedef struct {
 
 }Node, NNode[NUMSIZE];
 
-//definition of Node
-
-
 //end definition
 
+void init_suffix(Node& suffix);
 
 //definition of stack
 
 typedef struct {
-	int num[NUMSIZE];
+	NNode stack;
 	int stacksize;
 	int top;
 
 }Nsqstack;
+//the reload of operator == is ok;
+
 
 void Ninitstack(Nsqstack &s) {
 	int i = 0;
-	for (i = 0; i<10; i++) s.num[i] = 0;
-	s.stacksize = 10;
+	for (i = 0; i<NUMSIZE; i++) init_suffix(s.stack[i]);
+	s.stacksize = NUMSIZE;
 	s.top = -1;
 	return;
 }//end Ninitstack
@@ -61,21 +65,24 @@ void Ndestroystack(Nsqstack &s) {
 	return;
 }//end Ndestroystack
 
-int  Ngettop(Nsqstack s, int &a) {
+int  Ngettop(Nsqstack s, Node& suffix) {
 	if (s.top == -1) return 0;
-	a = s.num[s.top];
+	suffix = s.stack[s.top];
 	return 1;
 }//Ngettop
 
-void Npush(Nsqstack &s, int a) {
-	s.num[++s.top] = a;
+void Npush(Nsqstack &s, Node suffix) {
+	
+	s.stack[++s.top] = suffix;
+	
 	return;
 }//end Npush
 
-int Npop(Nsqstack &s, int &a) {
+int Npop(Nsqstack &s, Node &suffix) {
 	if (s.top == -1) return 0;
-	a = s.num[s.top];
-	s.num[s.top--] = 0;
+	suffix = s.stack[s.top];
+	init_suffix(s.stack[s.top]);
+	s.top--;
 	return 1;
 }//end Npop
 
@@ -123,6 +130,100 @@ int cal(int a, int b, char ch) {
 	case '^':return pow(a, b);//********
 	}
 }//end cal
+int cal(Node suffix_left, Node suffix_right, Node &suffix_result,char op) {
+	//cal:with para list having two node,and one result node
+	//the value return as -1,0,1 meanging result is -,0,+ 
+	//return -10000 means divide 0 error,2 means get a fraction
+	int flag_l = suffix_left.flag, flag_r = suffix_right.flag;
+	int temp = 0;
+	int para = 0;
+	if (flag_l == 0 && flag_r == 0) {
+		if (op == '+' ) {
+			suffix_result.num = suffix_left.num + suffix_right.num;
+			suffix_result.flag = 0;
+			return 1;
+		}//end if '+'
+		else if (op == '*') {
+			suffix_result.num = suffix_left.num * suffix_right.num;
+			suffix_result.flag = 0;
+			return 1;
+		}//end else if '*'
+		else if (op == '-') {
+			if (suffix_left.num < suffix_right.num) {
+				suffix_result.flag = 0;
+				return -1;
+			}//end if '-' get -
+			else if (suffix_left.num == suffix_right.num) {
+				suffix_result.num = 0;
+				suffix_result.flag = 0;
+				return 0;
+			}//end else if '-' get 0
+			else {
+				suffix_result.num = suffix_left.num - suffix_right.num;
+				suffix_result.flag = 0;
+				return 1;
+			}//end else '-' get +
+		}//end else if '-'
+		else if (op == '/') {
+			if (suffix_right.num == 0) {
+				return -10000;//divide 0 error
+			}
+			if (suffix_left.num < suffix_right.num) {
+				temp = gcd(suffix_left.num, suffix_right.num);
+				if (temp != 1) {
+					suffix_left.num  /= temp;
+					suffix_right.num /= temp;
+				}//if has a gcd larger than 1
+				suffix_result.frac[1] = 0;
+				suffix_result.frac[2] = suffix_left.num;
+				suffix_result.frac[3] = suffix_right.num;
+				suffix_result.flag = 2;
+
+				return 2;
+			}//end if '/' get frac<1
+			else if (suffix_left.num == suffix_right.num) {
+				suffix_result.num = 1;
+				suffix_result.flag = 0;
+				return 1;
+			}//end else if '/' get 1
+			else {
+				para = suffix_left.num % suffix_right.num;
+				if (para == 0) {
+					//can get a intergar
+					suffix_result.num = suffix_left.num / suffix_right.num;
+					suffix_result.flag = 0;
+					return 1;
+				}//end if is a >1 integar
+				else {
+					temp = suffix_left.num - para;
+					temp = temp / suffix_right.num;
+					suffix_result.frac[1] = temp;
+					suffix_left.num = suffix_left.num - temp*suffix_right.num;
+					
+					temp = gcd(suffix_left.num, suffix_right.num);
+					if (temp != 1) {
+						suffix_left.num /= temp;
+						suffix_right.num /= temp;
+					}//if has a gcd larger than 1
+					suffix_result.frac[2] = suffix_left.num;
+					suffix_result.frac[3] = suffix_right.num;
+					suffix_result.flag = 2;
+					suffix_result.flag = 0;
+					return 1;
+
+				}//end else is a >1 fraction
+				
+			}//end else '/' get >1 num&frac
+		}//end else if '/'
+
+	}//end if two integar
+	else if (flag_l == 2 && flag_r == 0|| flag_l == 0 && flag_r == 2|| flag_l == 2 && flag_r == 2) {
+
+
+	}
+
+
+}//end cal with Node
 
 
 
@@ -140,6 +241,26 @@ void getf(char *&p, char *q) {
 	*temp = '\0';
 }//end getf
 
+
+
+int gcd(int a, int b) {
+	int i = 0, j = 0, k = 0;
+	int result = 0;
+	if (a < b) {
+		i = a;
+		a = b;
+		b = i;
+	}//end if
+	if (a%b == 0)return b;
+	result = a%b;
+	while (result != 0) {
+		a = b;
+		b = result;
+		result = a%b;
+	}//end while
+	return b;
+
+}//end gcd
 
 
 
@@ -211,10 +332,13 @@ void init_suffix(Node& suffix) {
 
 
 void set_suffix(Node& suffix,int inf,int sup,int symbol,char* oper) {
-	//set_suffix:setting char/num/fraction with differernt value of para sybol
+	//set_suffix:setting char/num/fraction with differernt value of para symbol
 	//case 0:num case 1: char case 2:fraction
 	//inf: the inferior bound,sup: the superior bound
 	//oper: the set of operator
+	
+	int len_oper = strlen(oper);
+	int temp = 0;				//used to get the gcd of fraction
 	switch (symbol) {
 	case 0:
 		//set num
@@ -223,7 +347,7 @@ void set_suffix(Node& suffix,int inf,int sup,int symbol,char* oper) {
 		break;
 	case 1:
 		//set char
-		int len_oper = strlen(oper);
+		
 		suffix.flag = 1;
 		suffix.c = oper[random(0, len_oper - 1)];
 		break;
@@ -234,6 +358,25 @@ void set_suffix(Node& suffix,int inf,int sup,int symbol,char* oper) {
 		for (int i = 1; i <= 3; i++) {
 			suffix.frac[i] = random(inf, sup);
 		}
+		temp = gcd(suffix.frac[2], suffix.frac[3]);
+		if (temp != 1) {
+			suffix.frac[2] /= temp;
+			suffix.frac[3] /= temp;
+		}//end if gcd!=1 get the prime version
+
+		if (suffix.frac[2] == suffix.frac[3]) {
+			suffix.flag = 0;
+			suffix.num = suffix.frac[1] + 1;
+			for (int i = 0; i <= 3; i++)
+				suffix.frac[i] = 0;
+		}//end if equal,change to num
+		
+		else if (suffix.frac[2] > suffix.frac[3]) {
+			temp = suffix.frac[2];
+			suffix.frac[2] = suffix.frac[3];
+			suffix.frac[3] = temp;
+		}//get the true fraction
+		
 		break;
 	case 3:
 		//optional: set the double
@@ -242,6 +385,25 @@ void set_suffix(Node& suffix,int inf,int sup,int symbol,char* oper) {
 	}//end switch
 
 }//end set_suffix
+
+void set_num_suffix(Node& suffix, int inf, int sup, char* oper) {
+	//set the num&fraction of suffix
+	int flag = 0;
+	flag = srand_generator(inf, sup, (inf + sup) / 2);
+
+	if (flag == 0) {
+		//set a num
+		set_suffix(suffix, inf, sup, 0, oper);
+	}
+	else {
+		//set a fraction
+		set_suffix(suffix, inf, sup, 2, oper);
+	}//end else
+
+}//end set_num_suffix
+
+
+
 
 void suffix_generator(NNode &suffix,char* oper,int symbol) {
 	//generate the suffix erpression
@@ -266,14 +428,14 @@ void suffix_generator(NNode &suffix,char* oper,int symbol) {
 	if (length % 2 == 0) length++;
 	
 	//initialization
-	suffix[0].flag = 2;    //2 ************* 2means begin
+	suffix[0].flag = 3;    //3 ************* 3 means begin
 	suffix[0].num = length;//store the length
 	//end initialization
 
 
 	switch (symbol) {
 	case 0:
-
+		//case of only intergar
 		suffix[1].num = random(inf, sup);
 		suffix[1].flag = 0;
 		suffix[2].num = random(inf, sup);
@@ -281,6 +443,8 @@ void suffix_generator(NNode &suffix,char* oper,int symbol) {
 		count_num = 2;
 		i = 3;
 
+		//end initialization
+		
 		while (count_num < (1 + (length - 1) / 2)) {
 			if (count_num <= count_oper + 1) {
 				//the prefix is full(n numbers and n-1 operators)
@@ -312,33 +476,64 @@ void suffix_generator(NNode &suffix,char* oper,int symbol) {
 			}//end else
 
 		}//end while
-		while (count_oper < (length - 1) / 2) {
-			//fill the last operator
-			suffix[i].flag = 1;
-			suffix[i++].c = oper[random(0, len_oper - 1)];
-			count_oper++;
 
-		}//end while
+		break;//end case 0
+
 	case 1:
-		flag = srand_generator(inf, sup, (inf + sup) / 2);
+		//initialization
+		set_num_suffix(suffix[1], inf, sup, oper);
+		set_num_suffix(suffix[2], inf, sup, oper);
 
-		//if(flag==0){
-		suffix[1].num = random(inf, sup);
-		suffix[1].flag = 0;
-		suffix[2].num = random(inf, sup);
-		suffix[2].flag = 0;
+		
 		count_num = 2;
 		i = 3;
 		//end initialization
+		while (count_num < (1 + (length - 1) / 2)) {
+			if (count_num <= count_oper + 1) {
+				//the prefix is full(n numbers and n-1 operators)
+				set_num_suffix(suffix[i++], inf, sup, oper);
+				count_num++;
+			}//end if
+			else if (count_oper == ((length - 1) / 2 - 1)) {
+				//if there is almost done，then num should not be the last
+				set_num_suffix(suffix[i++], inf, sup, oper);
+				count_num++;
+			}
+			else {
+				flag = srand_generator(inf, sup, (inf + sup) / 2);
+				//generating num & operator with equal possibility
+				if (flag == 0) {
+					//generating the number
+					set_num_suffix(suffix[i++], inf, sup, oper);
+					count_num++;
+				}//end if
+				else {
+					//generating the operator
+					set_suffix(suffix[i++], inf, sup, 1, oper);				
+					count_oper++;
+				}//end else
+			}//end else
+
+		}//end while
+
+		break;
+
 
 	case 2:
+		//生成小数****************8
 
+		break;
 
 	}
-	
 
-	
 
+	while (count_oper < (length - 1) / 2) {
+		//fill the last operator
+		suffix[i].flag = 1;
+		suffix[i++].c = oper[random(0, len_oper - 1)];
+		count_oper++;
+
+	}//end while
 	suffix[i].flag = -1;// not need
 
 }//end suffix_generator
@@ -357,8 +552,9 @@ void node_out_file(fstream filename, Node suffix) {
 
 
 
-int calculate(NNode suffix) {
+int calculate(NNode suffix,int symbol) {
 	//calculate the suffix
+	//symbol decides the type of calculation
 	//未考虑分数，小数，真分数，返回整数
 	//未考虑中间出现负数
 	Nsqstack s;
@@ -368,44 +564,87 @@ int calculate(NNode suffix) {
 	int len_oper = (length - 1) / 2;
 
 	if (length >= 3) {
-		Npush(s, suffix[1].num);
-		Npush(s, suffix[2].num);
+		Npush(s, suffix[1]);
+		Npush(s, suffix[2]);
 	}
 	else return -10000;
+
+	Node suffix_left, suffix_right, suffix_result;
+	init_suffix(suffix_left);
+	init_suffix(suffix_right);
+	init_suffix(suffix_result);
 
 	int i = 3;
 	int left = 0, right = 0;//left number and right number 
 	char op = 0;			//operator
 	int result = 0;			//result
 
-	while (i<=length) {
-		if (suffix[i].flag == 0) {
-			//get a num
-			Npush(s, suffix[i].num);
-			i++;
-		}//end if
 
-		else if (suffix[i].flag == 1) {
-			//get a operator
-			Npop(s, right);
-			Npop(s, left);
-			op = suffix[i].c;
-			result=cal(left, right, op);
-			Npush(s, result);
-			i++;
-		}//end else if
 
-	}//end while
+	switch (symbol) {
+	case 0:
+		//all the num is integar
+		while (i <= length) {
+			if (suffix[i].flag == 0) {
+				//get a num
+				Npush(s, suffix[i]);
+				i++;
+			}//end if
 
-	Npop(s, result);
+			else if (suffix[i].flag == 1) {
+				//get a operator
+				Npop(s, suffix_right);
+				right = suffix_right.num;
+				Npop(s, suffix_left);
+				left = suffix_left.num;
+
+				op = suffix[i].c;
+				result = cal(left, right, op);
+				suffix_result.num = result;
+				suffix_result.flag = 0;
+				Npush(s, suffix_result);
+				i++;
+			}//end else if
+
+		}//end while
+
+		Npop(s, suffix_result);
+		result = suffix_result.num;
+		break;
+		//end case 0
+	case 1:
+		//the num includes fracs&integars
+
+
+
+
+		break;
+	case 2:
+
+		break;
+	}
+
 	return result;
-
 }//end calculate ,return int*********
 
 
 
 int main()
 {
+	Nsqstack s;
+	Ninitstack(s);
+	Node suffixq,suffix1;
+	init_suffix(suffixq);
+	init_suffix(suffix1);
+	set_suffix(suffixq, 1, 10, 2, "+-*");
+	Npush(s, suffixq);
+	Ngettop(s, suffix1);
+	cout << suffix1.frac[1] << "`" << suffix1.frac[2] <<"/" << suffix1.frac[3] << endl;
+	cout << suffixq.frac[1] << "`" << suffixq.frac[2] <<"/" << suffixq.frac[3] << endl;
+	
+	
+	
+	
 	NNode suffix;
 	int i = 0;
 	int key = 0;//key is the result of suffix
@@ -416,15 +655,15 @@ int main()
 	char* oper = "+-*";
 	for (i = 0; i < NUMSIZE; i++) {
 		init_suffix(suffix[i]);
-	}
+	}//end for i
 	fstream ofn(dist,ios::out);
 	fstream ofn_key(dist1, ios::out);
 
 	for (int j = 0; j < 100; j++) {
-		suffix_generator(suffix, oper);
+		suffix_generator(suffix, oper,0);
 		ofn << j + 1 << "	";
-		key=calculate(suffix);
-		ofn_key << j + 1 << "	" << key << endl;
+		//key=calculate(suffix);
+		//ofn_key << j + 1 << "	" << key << endl;
 		for (i = 1; i <= suffix[0].num; i++) {
 			if (suffix[i].flag == -1) break;
 			else if (suffix[i].flag == 0) {
@@ -432,17 +671,23 @@ int main()
 				ofn << suffix[i].num << ' ';
 				cout << suffix[i].num << ' ';
 			}//end elseif
+			else if (suffix[i].flag == 2) {
+				ofn << suffix[i].frac[1] <<'`'<<suffix[i].frac[2]<<'/'<<suffix[i].frac[3]<< ' ';
+				cout << suffix[i].frac[1] << '`' << suffix[i].frac[2] << '/' << suffix[i].frac[3] << ' ';
+
+			}
 			else {
 				ofn << suffix[i].c << ' ';
 				cout << suffix[i].c << ' ';
 			}//end else
 			
-		}
+		}//end for j
 		cout << endl;
 		ofn << endl;
 
-	}
+	}//end for i
 	system("pause");
 	return 0;
+
 }//end main
 
